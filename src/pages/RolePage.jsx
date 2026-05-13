@@ -126,6 +126,8 @@ export default function RolePage() {
         </div>
         <p style={{ fontSize:12, color:"#57534E", marginTop:12, marginBottom:0 }}>
           © 2026 ReviewAI · Free forever · Built with Claude AI ·{" "}
+          <a href="https://github.com/deligosivan23-hash/perf-review-app" target="_blank" rel="noopener noreferrer" style={{ color:"#78716C", textDecoration:"none" }}>GitHub</a>
+          {" "}·{" "}
           <Link to="/privacy" style={{ color:"#78716C", textDecoration:"none" }}>Privacy Policy</Link>
         </p>
       </footer>

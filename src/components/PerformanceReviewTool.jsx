@@ -599,9 +599,11 @@ export default function PerformanceReviewTool({ embedded = false }) {
         }}>
           <Wordmark light />
           <p style={{ fontSize:12, color:"#57534E", marginTop:12, marginBottom:0 }}>
-            © 2026 ReviewAI · Free forever · Built with Claude AI ·{" "}
-            <a href="/privacy" style={{ color:"#78716C", textDecoration:"none" }}>Privacy Policy</a>
-          </p>
+          © 2026 ReviewAI · Free forever · Built with Claude AI ·{" "}
+          <a href="https://github.com/deligosivan23-hash/perf-review-app" target="_blank" rel="noopener noreferrer" style={{ color:"#78716C", textDecoration:"none" }}>GitHub</a>
+          {" "}·{" "}
+          <a href="/privacy" style={{ color:"#78716C", textDecoration:"none" }}>Privacy Policy</a>
+        </p>
         </footer>
       )}
     </div>

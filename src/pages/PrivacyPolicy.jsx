@@ -33,7 +33,7 @@ export default function PrivacyPolicy() {
           },
           {
             title:"Contact",
-            body:"If you have questions about this privacy policy, you may contact us through the GitHub repository linked in the footer."
+            body:"If you have questions about this privacy policy, you may contact us through our <a href="https://github.com/deligosivan23-hash/perf-review-app" target="_blank" rel="noopener noreferrer" style={{ color:"#B45309", textDecoration:"none" }}>GitHub repository</a>.
           },
         ].map((section, i) => (
           <div key={i} style={{ marginBottom:32 }}>
