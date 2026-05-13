@@ -31,16 +31,23 @@ export default function PrivacyPolicy() {
             title:"Children",
             body:"This tool is intended for professional use by adults. We do not knowingly collect information from anyone under 13 years of age."
           },
-          {
-            title:"Contact",
-            body:"If you have questions about this privacy policy, you may contact us through our <a href="https://github.com/deligosivan23-hash/perf-review-app" target="_blank" rel="noopener noreferrer" style={{ color:"#B45309", textDecoration:"none" }}>GitHub repository</a>.
-          },
+          
         ].map((section, i) => (
           <div key={i} style={{ marginBottom:32 }}>
             <h2 style={{ fontFamily:"'Lora',serif", fontSize:"1.2rem", color:"#1C1917", margin:"0 0 10px" }}>{section.title}</h2>
             <p style={{ fontSize:14, color:"#44403C", lineHeight:1.75, margin:0 }}>{section.body}</p>
           </div>
         ))}
+
+        <div style={{ marginBottom:32 }}>
+          <h2 style={{ fontFamily:"'Lora',serif", fontSize:"1.2rem", color:"#1C1917", margin:"0 0 10px" }}>Contact</h2>
+          <p style={{ fontSize:14, color:"#44403C", lineHeight:1.75, margin:0 }}>
+            If you have questions about this privacy policy, you may contact us through our{" "}
+            <a href="https://github.com/deligosivan23-hash/perf-review-app" target="_blank" rel="noopener noreferrer" style={{ color:"#B45309", textDecoration:"none" }}>
+              GitHub repository
+            </a>.
+          </p>
+        </div>
       </div>
     </div>
   );
