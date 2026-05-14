@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } from 'docx';
 
 const C = {
   amber: "#B45309",
@@ -21,7 +20,6 @@ const styles = `
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
 
   .rv-input {
     width:100%; box-sizing:border-box;
@@ -153,6 +151,8 @@ export default function PerformanceReviewTool({ embedded = false }) {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [employeeName, setEmployeeName] = useState("");
+  const [reviewerName, setReviewerName] = useState("");
   const outputRef = useRef(null);
   const toolRef = useRef(null);
 
@@ -203,73 +203,162 @@ export default function PerformanceReviewTool({ embedded = false }) {
     } finally { setLoading(false); }
   };
 
- const copyToClipboard = async () => {
+  const copyToClipboard = async () => {
     await navigator.clipboard.writeText(output);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
 
   const downloadDocx = async () => {
-    const sections = output.split(/\n(?=## )/).filter(Boolean);
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+            AlignmentType, BorderStyle, WidthType, ShadingType, PageNumber,
+            Footer } = await import('docx');
+
     const children = [];
 
+    // ── Document Title Block ──
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: "Performance Review", bold: true, size: 36, font: "Arial" })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 120 },
-        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "B45309", space: 4 } },
+        children: [new TextRun({ text: "PERFORMANCE REVIEW", bold: true, size: 32, font: "Arial", color: "1C1917", characterSpacing: 80 })],
+        alignment: AlignmentType.LEFT,
+        spacing: { before: 0, after: 80 },
       }),
       new Paragraph({
-        children: [new TextRun({ text: `Role: ${role}`, size: 24, font: "Arial", color: "44403C" })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 60 },
-      }),
-      new Paragraph({
-        children: [new TextRun({ text: `Review Period: ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`, size: 24, font: "Arial", color: "44403C" })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 480 },
+        children: [new TextRun({ text: "Confidential  ·  [Company Name]", size: 18, font: "Arial", color: "78716C", italics: true })],
+        alignment: AlignmentType.LEFT,
+        spacing: { before: 0, after: 320 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "1C1917", space: 6 } },
       }),
     );
 
-    for (const section of sections) {
+    // ── Info Table ──
+    const cellBorder = { style: BorderStyle.SINGLE, size: 1, color: "E7E5E4" };
+    const allBorders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
+    const labelShading = { type: ShadingType.CLEAR, fill: "F5F4F0" };
+
+    const infoData = [
+      ["Employee", employeeName || "[Employee Name]"],
+      ["Job Title", role || "[Job Title]"],
+      ["Reviewer", reviewerName || "[Reviewer Name]"],
+      ["Review Period", new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })],
+      ["Date Prepared", new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })],
+      ["Tone", tone.charAt(0).toUpperCase() + tone.slice(1)],
+    ];
+
+    const infoRows = infoData.map(([label, value]) =>
+      new TableRow({
+        children: [
+          new TableCell({
+            borders: allBorders,
+            shading: labelShading,
+            width: { size: 2200, type: WidthType.DXA },
+            margins: { top: 80, bottom: 80, left: 160, right: 160 },
+            children: [new Paragraph({
+              children: [new TextRun({ text: label, bold: true, size: 18, font: "Arial", color: "44403C" })],
+            })],
+          }),
+          new TableCell({
+            borders: allBorders,
+            width: { size: 7160, type: WidthType.DXA },
+            margins: { top: 80, bottom: 80, left: 160, right: 160 },
+            children: [new Paragraph({
+              children: [new TextRun({ text: value, size: 18, font: "Arial", color: "1C1917" })],
+            })],
+          }),
+        ],
+      })
+    );
+
+    children.push(
+      new Paragraph({ children: [new TextRun("")], spacing: { after: 200 } }),
+      new Table({
+        width: { size: 9360, type: WidthType.DXA },
+        columnWidths: [2200, 7160],
+        rows: infoRows,
+      }),
+      new Paragraph({ children: [new TextRun("")], spacing: { after: 400 } }),
+    );
+
+    // ── Review Sections ──
+    const rawSections = output.split(/\n(?=## )/).filter(Boolean);
+
+    rawSections.forEach((section, idx) => {
       const lines = section.split('\n').filter(Boolean);
       const heading = lines[0].replace(/^## /, '').trim();
       const body = lines.slice(1).join(' ').trim();
+      const number = idx + 1;
 
       children.push(
         new Paragraph({
-          children: [new TextRun({ text: heading.toUpperCase(), bold: true, size: 24, font: "Arial", color: "B45309" })],
-          spacing: { before: 360, after: 120 },
-          border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: "FEF3C7", space: 4 } },
+          children: [new TextRun({ text: `${number}.  ${heading.toUpperCase()}`, bold: true, size: 22, font: "Arial", color: "1C1917" })],
+          spacing: { before: 400, after: 80 },
+          border: { bottom: { style: BorderStyle.SINGLE, size: 3, color: "B45309", space: 4 } },
         }),
         new Paragraph({
-          children: [new TextRun({ text: body, size: 22, font: "Arial", color: "1C1917" })],
-          spacing: { after: 240 },
+          children: [new TextRun({ text: body, size: 21, font: "Arial", color: "44403C" })],
+          spacing: { before: 140, after: 80 },
           alignment: AlignmentType.JUSTIFIED,
+        }),
+      );
+    });
+
+    // ── Signature Block ──
+    children.push(
+      new Paragraph({ children: [new TextRun("")], spacing: { before: 600, after: 0 } }),
+      new Paragraph({
+        children: [new TextRun({ text: "", size: 21 })],
+        border: { top: { style: BorderStyle.SINGLE, size: 2, color: "44403C", space: 4 } },
+        spacing: { before: 0, after: 320 },
+      }),
+    );
+
+    const signatureRows = [
+      ["Employee Signature", employeeName || "[Employee Name]"],
+      ["Reviewer Signature", reviewerName || "[Reviewer Name]"],
+      ["HR Approval", "[HR Representative]"],
+    ];
+
+    for (const [sigLabel, sigName] of signatureRows) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `${sigLabel}:  `, bold: true, size: 20, font: "Arial", color: "1C1917" }),
+            new TextRun({ text: `${sigName}`, size: 20, font: "Arial", color: "78716C" }),
+            new TextRun({ text: "          Signature: ________________________          Date: ________________", size: 20, font: "Arial", color: "AAAAAA" }),
+          ],
+          spacing: { before: 0, after: 240 },
         }),
       );
     }
 
-    children.push(
-      new Paragraph({
-        children: [new TextRun({ text: "Generated by ReviewAI — reviewai.vercel.app · Always apply human judgment before submitting.", size: 18, font: "Arial", color: "78716C", italics: true })],
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 480 },
-        border: { top: { style: BorderStyle.SINGLE, size: 2, color: "E7E5E4", space: 4 } },
-      }),
-    );
+    // ── Build Document ──
+    const employeeLabel = employeeName || role || "Employee";
 
     const doc = new Document({
       styles: {
-        default: { document: { run: { font: "Arial", size: 22 } } },
+        default: { document: { run: { font: "Arial", size: 21 } } },
       },
       sections: [{
         properties: {
           page: {
             size: { width: 12240, height: 15840 },
-            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+            margin: { top: 1260, right: 1260, bottom: 1260, left: 1260 },
           },
+        },
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${employeeLabel}  ·  Performance Review  ·  Page `, size: 16, font: "Arial", color: "94A3B8" }),
+                  new TextRun({ children: [new PageNumber()], size: 16, font: "Arial", color: "94A3B8" }),
+                  new TextRun({ text: "  ·  Generated by ReviewAI — always apply human judgment", size: 16, font: "Arial", color: "94A3B8", italics: true }),
+                ],
+                alignment: AlignmentType.CENTER,
+                border: { top: { style: BorderStyle.SINGLE, size: 1, color: "E7E5E4", space: 6 } },
+              }),
+            ],
+          }),
         },
         children,
       }],
@@ -279,10 +368,11 @@ export default function PerformanceReviewTool({ embedded = false }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `performance-review-${role.toLowerCase().replace(/\s+/g, '-')}.docx`;
+    a.download = `performance-review-${employeeLabel.toLowerCase().replace(/\s+/g, '-')}.docx`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
   const tones = [
     { id:"constructive", label:"Constructive", desc:"Growth-focused" },
     { id:"direct", label:"Direct", desc:"Candid & clear" },
@@ -332,7 +422,6 @@ export default function PerformanceReviewTool({ embedded = false }) {
         padding:"80px 24px 90px",
         textAlign:"center", position:"relative", overflow:"hidden"
       }}>
-        {/* Grain texture */}
         <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.04, pointerEvents:"none" }}>
           <filter id="grain">
             <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
@@ -340,12 +429,10 @@ export default function PerformanceReviewTool({ embedded = false }) {
           </filter>
           <rect width="100%" height="100%" filter="url(#grain)"/>
         </svg>
-        {/* Warm glow */}
         <div style={{
           position:"absolute", inset:0, pointerEvents:"none",
           background:`radial-gradient(ellipse 50% 60% at 50% 100%, rgba(180,83,9,0.18) 0%, transparent 70%)`
         }}/>
-
         <div style={{
           position:"relative", maxWidth:680, margin:"0 auto",
           animation: mounted ? "fadeUp 0.55s ease both" : "none"
@@ -363,7 +450,6 @@ export default function PerformanceReviewTool({ embedded = false }) {
               textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif"
             }}>Free AI Tool</span>
           </div>
-
           <h1 className="rv-hero-title" style={{
             fontFamily:"'Lora',serif", fontWeight:700,
             color:C.white, lineHeight:1.1,
@@ -372,22 +458,15 @@ export default function PerformanceReviewTool({ embedded = false }) {
             Performance Reviews,<br/>
             <em style={{ color:C.amberMid, fontStyle:"normal" }}>Written by AI.</em>
           </h1>
-
           <p style={{
             fontSize:17, color:"#A8A29E", fontWeight:300,
-            lineHeight:1.65, margin:"0 auto 18px",
-            maxWidth:460
+            lineHeight:1.65, margin:"0 auto 18px", maxWidth:460
           }}>
             Structured, HR-ready reviews built from your notes — in under 30 seconds.
           </p>
-
-          <p style={{
-            fontSize:13, color:"#78716C", margin:"0 auto 36px",
-            fontStyle:"italic"
-          }}>
+          <p style={{ fontSize:13, color:"#78716C", margin:"0 auto 36px", fontStyle:"italic" }}>
             Trusted by managers and HR teams across 10+ role types
           </p>
-
           <div className="rv-trust">
             {["No signup", "No data stored", "10 role types", "Rate limited & secure"].map((item, i) => (
               <div key={i} style={{ display:"flex", alignItems:"center", gap:7, color:"#78716C", fontSize:13 }}>
@@ -400,10 +479,7 @@ export default function PerformanceReviewTool({ embedded = false }) {
       </header>
 
       {/* How it works */}
-      <div style={{
-        background:C.white, borderBottom:`1px solid ${C.border}`,
-        padding:"20px 24px"
-      }}>
+      <div style={{ background:C.white, borderBottom:`1px solid ${C.border}`, padding:"20px 24px" }}>
         <div style={{ maxWidth:1100, margin:"0 auto" }}>
           <div className="rv-steps">
             {[
@@ -417,8 +493,7 @@ export default function PerformanceReviewTool({ embedded = false }) {
                     width:28, height:28, borderRadius:8,
                     background:C.amberLight, border:`1px solid #FDE68A`,
                     display:"flex", alignItems:"center", justifyContent:"center",
-                    fontSize:11, fontWeight:800, color:C.amber,
-                    flexShrink:0
+                    fontSize:11, fontWeight:800, color:C.amber, flexShrink:0
                   }}>{s.n}</div>
                   <span style={{ fontSize:12.5, fontWeight:500, color:C.slate, maxWidth:180 }}>{s.label}</span>
                 </div>
@@ -443,13 +518,39 @@ export default function PerformanceReviewTool({ embedded = false }) {
           }}>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:26 }}>
               <div style={{ width:5, height:5, borderRadius:"50%", background:C.amber }}/>
-              <span style={{
-                fontSize:10, fontWeight:800, letterSpacing:"0.16em",
-                textTransform:"uppercase", color:C.slateLight
-              }}>Employee Details</span>
+              <span style={{ fontSize:10, fontWeight:800, letterSpacing:"0.16em", textTransform:"uppercase", color:C.slateLight }}>Employee Details</span>
             </div>
 
             <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+
+              {/* Employee + Reviewer names */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div>
+                  <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.inkSoft, marginBottom:7 }}>
+                    Employee Name <span style={{ fontSize:11, fontWeight:400, color:C.slateLight }}>optional</span>
+                  </label>
+                  <input
+                    className="rv-input"
+                    type="text"
+                    value={employeeName}
+                    onChange={e => setEmployeeName(e.target.value)}
+                    placeholder="e.g. Jane Smith"
+                  />
+                </div>
+                <div>
+                  <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.inkSoft, marginBottom:7 }}>
+                    Reviewer Name <span style={{ fontSize:11, fontWeight:400, color:C.slateLight }}>optional</span>
+                  </label>
+                  <input
+                    className="rv-input"
+                    type="text"
+                    value={reviewerName}
+                    onChange={e => setReviewerName(e.target.value)}
+                    placeholder="e.g. John Manager"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.inkSoft, marginBottom:7 }}>
                   Job Role / Title <span style={{ color:C.red }}>*</span>
@@ -506,35 +607,21 @@ export default function PerformanceReviewTool({ embedded = false }) {
                       className={`rv-tone${tone === t.id ? " active" : ""}`}
                       onClick={() => setTone(t.id)}
                     >
-                      <div style={{
-                        fontSize:12, fontWeight:700,
-                        color: tone === t.id ? C.amber : C.inkSoft,
-                        marginBottom:3
-                      }}>{t.label}</div>
-                      <div style={{
-                        fontSize:10, color: tone === t.id ? C.amberMid : C.slateLight
-                      }}>{t.desc}</div>
+                      <div style={{ fontSize:12, fontWeight:700, color: tone === t.id ? C.amber : C.inkSoft, marginBottom:3 }}>{t.label}</div>
+                      <div style={{ fontSize:10, color: tone === t.id ? C.amberMid : C.slateLight }}>{t.desc}</div>
                     </button>
                   ))}
                 </div>
               </div>
 
               {error && (
-                <div style={{
-                  background:"#FEF2F2", border:"1px solid #FECACA",
-                  color:C.red, fontSize:13, padding:"11px 15px", borderRadius:9
-                }}>{error}</div>
+                <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", color:C.red, fontSize:13, padding:"11px 15px", borderRadius:9 }}>{error}</div>
               )}
 
               <button className="rv-btn" onClick={generate} disabled={loading}>
                 {loading ? (
                   <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-                    <span style={{
-                      width:15, height:15, borderRadius:"50%",
-                      border:"2px solid rgba(255,255,255,0.3)",
-                      borderTopColor:"#fff", display:"inline-block",
-                      animation:"spin 0.7s linear infinite"
-                    }}/>
+                    <span style={{ width:15, height:15, borderRadius:"50%", border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", display:"inline-block", animation:"spin 0.7s linear infinite" }}/>
                     Writing Review…
                   </span>
                 ) : "Generate Performance Review →"}
@@ -555,22 +642,12 @@ export default function PerformanceReviewTool({ embedded = false }) {
           }}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:22 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                <div style={{
-                  width:5, height:5, borderRadius:"50%",
-                  background: output && !loading ? C.green : C.border,
-                  transition:"background 0.4s"
-                }}/>
-                <span style={{
-                  fontSize:10, fontWeight:800, letterSpacing:"0.16em",
-                  textTransform:"uppercase", color:C.slateLight
-                }}>Generated Review</span>
+                <div style={{ width:5, height:5, borderRadius:"50%", background: output && !loading ? C.green : C.border, transition:"background 0.4s" }}/>
+                <span style={{ fontSize:10, fontWeight:800, letterSpacing:"0.16em", textTransform:"uppercase", color:C.slateLight }}>Generated Review</span>
               </div>
               {output && !loading && (
                 <div style={{ display:"flex", gap:8 }}>
-                  <button
-                    className={`rv-copy${copied ? " copied" : ""}`}
-                    onClick={copyToClipboard}
-                  >
+                  <button className={`rv-copy${copied ? " copied" : ""}`} onClick={copyToClipboard}>
                     {copied ? "✓ Copied" : "Copy text"}
                   </button>
                   <button
@@ -584,19 +661,9 @@ export default function PerformanceReviewTool({ embedded = false }) {
               )}
             </div>
 
-            {/* Empty state */}
             {!output && !loading && (
-              <div style={{
-                flex:1, border:`1.5px dashed ${C.border}`,
-                borderRadius:12, overflow:"hidden", position:"relative",
-                background:C.creamDark
-              }}>
-                {/* Blurred sample */}
-                <div style={{
-                  padding:"20px 20px 0",
-                  filter:"blur(4px)", opacity:0.3,
-                  userSelect:"none", pointerEvents:"none"
-                }}>
+              <div style={{ flex:1, border:`1.5px dashed ${C.border}`, borderRadius:12, overflow:"hidden", position:"relative", background:C.creamDark }}>
+                <div style={{ padding:"20px 20px 0", filter:"blur(4px)", opacity:0.3, userSelect:"none", pointerEvents:"none" }}>
                   <div style={{ fontSize:10, fontWeight:800, color:C.amber, textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:8, paddingBottom:8, borderBottom:`1px solid ${C.amberLight}` }}>Overall Performance</div>
                   <p style={{ fontSize:13, color:C.slate, lineHeight:1.7, marginBottom:16 }}>
                     Jordan exceeded expectations across all three product initiatives this quarter, delivering the analytics dashboard two weeks ahead of schedule while simultaneously reducing on-call incidents by 34%.
@@ -606,20 +673,8 @@ export default function PerformanceReviewTool({ embedded = false }) {
                     Jordan's ability to translate ambiguous business requirements into precise technical specifications was most evident in the Q3 platform migration, where clear documentation prevented three potential integration failures…
                   </p>
                 </div>
-                {/* Overlay */}
-                <div style={{
-                  position:"absolute", inset:0,
-                  display:"flex", flexDirection:"column",
-                  alignItems:"center", justifyContent:"center",
-                  background:"rgba(250,250,248,0.72)"
-                }}>
-                  <div style={{
-                    width:50, height:50, borderRadius:14,
-                    background:C.amber,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    marginBottom:14,
-                    boxShadow:"0 4px 16px rgba(180,83,9,0.28)"
-                  }}>
+                <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:"rgba(250,250,248,0.72)" }}>
+                  <div style={{ width:50, height:50, borderRadius:14, background:C.amber, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:14, boxShadow:"0 4px 16px rgba(180,83,9,0.28)" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
@@ -630,64 +685,42 @@ export default function PerformanceReviewTool({ embedded = false }) {
               </div>
             )}
 
-            {/* Loading */}
             {loading && !output && (
               <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <div style={{ textAlign:"center" }}>
-                  <div style={{
-                    width:40, height:40,
-                    border:`3px solid ${C.amberLight}`,
-                    borderTopColor:C.amber,
-                    borderRadius:"50%", margin:"0 auto 14px",
-                    animation:"spin 0.7s linear infinite"
-                  }}/>
+                  <div style={{ width:40, height:40, border:`3px solid ${C.amberLight}`, borderTopColor:C.amber, borderRadius:"50%", margin:"0 auto 14px", animation:"spin 0.7s linear infinite" }}/>
                   <p style={{ fontSize:14, color:C.slateLight, margin:0 }}>Writing your review…</p>
                   <p style={{ fontSize:12, color:C.border, margin:"5px 0 0", fontStyle:"italic" }}>Usually takes 8–12 seconds</p>
                 </div>
               </div>
             )}
 
-            {/* Output */}
             {output && (
               <div ref={outputRef} style={{ flex:1, overflowY:"auto", paddingRight:4, maxHeight:520 }}>
                 <ReviewOutput text={output} />
                 {loading && (
-                  <span style={{
-                    display:"inline-block", width:7, height:18,
-                    background:C.amber, marginLeft:2, borderRadius:2,
-                    verticalAlign:"middle", animation:"blink 1s ease infinite"
-                  }}/>
+                  <span style={{ display:"inline-block", width:7, height:18, background:C.amber, marginLeft:2, borderRadius:2, verticalAlign:"middle", animation:"blink 1s ease infinite" }}/>
                 )}
               </div>
             )}
           </div>
         </div>
 
-        {/* Disclaimer */}
-        <p style={{
-          textAlign:"center", fontSize:12, color:C.slateLight,
-          marginTop:36, marginBottom:0, lineHeight:1.6
-        }}>
+        <p style={{ textAlign:"center", fontSize:12, color:C.slateLight, marginTop:36, marginBottom:0, lineHeight:1.6 }}>
           Powered by Claude AI · Reviews are a starting point — always apply human judgment before submitting to HR ·{" "}
           <a href="/privacy" style={{ color:C.amber, textDecoration:"none" }}>Privacy Policy</a>
         </p>
       </main>
 
-      {/* Footer — only shown on homepage, not when embedded in RolePage */}
       {!embedded && (
-        <footer style={{
-          background:C.inkSoft,
-          padding:"36px 24px",
-          textAlign:"center",
-          borderTop:`1px solid #292524`
-        }}>
+        <footer style={{ background:C.inkSoft, padding:"36px 24px", textAlign:"center", borderTop:`1px solid #292524` }}>
           <Wordmark light />
           <p style={{ fontSize:12, color:"#57534E", marginTop:12, marginBottom:0 }}>
-          © 2026 ReviewAI · Free forever · Built with Claude AI ·{" "}
-          <a href="https://github.com/deligosivan23-hash/perf-review-app" target="_blank" rel="noopener noreferrer" style={{ color:"#78716C", textDecoration:"none" }}>GitHub</a>
-          {" "}·{" "}
-          <a href="/privacy" style={{ color:"#78716C", textDecoration:"none" }}>Privacy Policy</a>
-        </p>
+            © 2026 ReviewAI · Free forever · Built with Claude AI ·{" "}
+            <a href="https://github.com/deligosivan23-hash/perf-review-app" target="_blank" rel="noopener noreferrer" style={{ color:"#78716C", textDecoration:"none" }}>GitHub</a>
+            {" "}·{" "}
+            <a href="/privacy" style={{ color:"#78716C", textDecoration:"none" }}>Privacy Policy</a>
+          </p>
         </footer>
       )}
     </div>
